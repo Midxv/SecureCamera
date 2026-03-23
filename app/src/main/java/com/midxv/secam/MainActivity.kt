@@ -10,23 +10,25 @@ import android.media.MediaMetadataRetriever
 import android.os.Bundle
 import android.os.SystemClock
 import android.util.Log
+import android.view.Surface
 import android.view.View
 import android.view.WindowManager
 import android.widget.Chronometer
 import android.widget.ImageButton
 import android.widget.TextView
-import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.camera.core.*
+import androidx.camera.core.resolutionselector.ResolutionSelector
+import androidx.camera.core.resolutionselector.ResolutionStrategy
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.video.*
 import androidx.camera.video.Recorder
 import androidx.camera.view.PreviewView
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
-import androidx.exifinterface.media.ExifInterface
 import androidx.security.crypto.EncryptedFile
 import androidx.security.crypto.MasterKey
+import coil.load
 import com.google.android.material.imageview.ShapeableImageView
 import java.io.File
 import java.util.concurrent.ExecutorService
@@ -52,23 +54,14 @@ class MainActivity : AppCompatActivity() {
 
     companion object {
         private const val TAG = "SeCam"
-        private val REQUIRED_PERMISSIONS = arrayOf(
-            Manifest.permission.CAMERA,
-            Manifest.permission.RECORD_AUDIO
-        )
+        private val REQUIRED_PERMISSIONS = arrayOf(Manifest.permission.CAMERA, Manifest.permission.RECORD_AUDIO)
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-
-        // 1. MAXIMUM SECURITY: Prevent Screenshots and Screen Recording
-        window.setFlags(
-            WindowManager.LayoutParams.FLAG_SECURE,
-            WindowManager.LayoutParams.FLAG_SECURE
-        )
+        window.setFlags(WindowManager.LayoutParams.FLAG_SECURE, WindowManager.LayoutParams.FLAG_SECURE)
         setContentView(R.layout.activity_main)
 
-        // Initialize UI Elements
         viewFinder = findViewById(R.id.viewFinder)
         btnCapture = findViewById(R.id.btnCapture)
         textVideoMode = findViewById(R.id.textVideoMode)
@@ -78,44 +71,19 @@ class MainActivity : AppCompatActivity() {
         btnGallery = findViewById(R.id.btnGallery)
         val btnFlipCamera = findViewById<ImageButton>(R.id.btnFlipCamera)
 
-        // Permissions & Camera Init
-        if (allPermissionsGranted()) startCamera()
-        else ActivityCompat.requestPermissions(this, REQUIRED_PERMISSIONS, 10)
-
+        if (allPermissionsGranted()) startCamera() else ActivityCompat.requestPermissions(this, REQUIRED_PERMISSIONS, 10)
         cameraExecutor = Executors.newSingleThreadExecutor()
 
-        // --- CLICK LISTENERS ---
-        textPhotoMode.setOnClickListener {
-            if (!isVideoMode || recording != null) return@setOnClickListener
-            isVideoMode = false
-            triggerModeTransition()
-        }
-
-        textVideoMode.setOnClickListener {
-            if (isVideoMode) return@setOnClickListener
-            isVideoMode = true
-            triggerModeTransition()
-        }
-
-        btnFlipCamera.setOnClickListener {
-            if (recording != null) return@setOnClickListener
-            lensFacing = if (lensFacing == CameraSelector.LENS_FACING_FRONT) CameraSelector.LENS_FACING_BACK else CameraSelector.LENS_FACING_FRONT
-            triggerModeTransition()
-            startCamera()
-        }
-
-        btnCapture.setOnClickListener {
-            if (isVideoMode) captureVideo() else takePhoto()
-        }
-
-        btnGallery.setOnClickListener {
-            startActivity(Intent(this, GalleryActivity::class.java))
-        }
+        textPhotoMode.setOnClickListener { if (!isVideoMode || recording != null) return@setOnClickListener; isVideoMode = false; triggerModeTransition() }
+        textVideoMode.setOnClickListener { if (isVideoMode) return@setOnClickListener; isVideoMode = true; triggerModeTransition() }
+        btnFlipCamera.setOnClickListener { if (recording != null) return@setOnClickListener; lensFacing = if (lensFacing == CameraSelector.LENS_FACING_FRONT) CameraSelector.LENS_FACING_BACK else CameraSelector.LENS_FACING_FRONT; triggerModeTransition(); startCamera() }
+        btnCapture.setOnClickListener { if (isVideoMode) captureVideo() else takePhoto() }
+        btnGallery.setOnClickListener { startActivity(Intent(this, GalleryActivity::class.java)) }
     }
 
     override fun onResume() {
         super.onResume()
-        loadLastThumbnail() // Refresh gallery icon when returning from the vault
+        loadLastThumbnail()
     }
 
     private fun triggerModeTransition() {
@@ -129,7 +97,7 @@ class MainActivity : AppCompatActivity() {
         if (isVideoMode) {
             textVideoMode.setTextColor(Color.parseColor("#F3C623"))
             textPhotoMode.setTextColor(Color.parseColor("#888888"))
-            btnCapture.setColorFilter(Color.parseColor("#E53935")) // Red for video
+            btnCapture.setColorFilter(Color.parseColor("#E53935"))
         } else {
             textPhotoMode.setTextColor(Color.parseColor("#F3C623"))
             textVideoMode.setTextColor(Color.parseColor("#888888"))
@@ -143,64 +111,55 @@ class MainActivity : AppCompatActivity() {
             val cameraProvider = cameraProviderFuture.get()
             val preview = Preview.Builder().build().also { it.setSurfaceProvider(viewFinder.surfaceProvider) }
 
+            // --- SMART LOGIC: MAXIMUM QUALITY OVERRIDE ---
+            val resolutionSelector = ResolutionSelector.Builder()
+                .setResolutionStrategy(ResolutionStrategy.HIGHEST_AVAILABLE_STRATEGY)
+                .build()
+
+            val rotation = viewFinder.display?.rotation ?: Surface.ROTATION_0
+
             imageCapture = ImageCapture.Builder()
                 .setCaptureMode(ImageCapture.CAPTURE_MODE_MAXIMIZE_QUALITY)
+                .setResolutionSelector(resolutionSelector) // Force highest sensor resolution
+                .setJpegQuality(100) // 100% uncompressed raw detail
+                .setTargetRotation(rotation) // Tell the hardware which way is up!
                 .build()
 
-            val recorder = Recorder.Builder()
-                .setQualitySelector(QualitySelector.from(Quality.FHD))
-                .build()
-
+            val recorder = Recorder.Builder().setQualitySelector(QualitySelector.from(Quality.FHD)).build()
             videoCapture = VideoCapture.withOutput(recorder)
 
             try {
                 cameraProvider.unbindAll()
-                cameraProvider.bindToLifecycle(
-                    this, CameraSelector.Builder().requireLensFacing(lensFacing).build(), preview, imageCapture, videoCapture
-                )
+                cameraProvider.bindToLifecycle(this, CameraSelector.Builder().requireLensFacing(lensFacing).build(), preview, imageCapture, videoCapture)
             } catch (exc: Exception) { Log.e(TAG, "Binding failed", exc) }
         }, ContextCompat.getMainExecutor(this))
     }
 
-    // --- PHOTO CAPTURE ---
     private fun takePhoto() {
-        val tempFile = File(cacheDir, "temp_img_${System.currentTimeMillis()}.heic")
+        val imageCapture = imageCapture ?: return
 
-        imageCapture?.takePicture(
-            ImageCapture.OutputFileOptions.Builder(tempFile).build(),
-            ContextCompat.getMainExecutor(this),
-            object : ImageCapture.OnImageSavedCallback {
-                override fun onError(exc: ImageCaptureException) {
-                    Log.e(TAG, "Capture failed", exc)
-                }
-                override fun onImageSaved(output: ImageCapture.OutputFileResults) {
-                    cameraExecutor.execute {
-                        // FIX: Force Exif Rotation to Right (90 Degrees) before encryption
-                        try {
-                            val exif = ExifInterface(tempFile.absolutePath)
-                            exif.setAttribute(ExifInterface.TAG_ORIENTATION, ExifInterface.ORIENTATION_ROTATE_90.toString())
-                            exif.saveAttributes()
-                        } catch (e: Exception) {
-                            Log.e(TAG, "Failed to apply EXIF rotation", e)
-                        }
+        // SMART LOGIC: Sync rotation one last time right before the shutter clicks
+        imageCapture.targetRotation = viewFinder.display?.rotation ?: Surface.ROTATION_0
 
-                        encryptAndSaveFile(tempFile, false)
-                        runOnUiThread { loadLastThumbnail() }
-                    }
+        // Changed to .jpg to ensure EXIF metadata is parsed correctly by Android/Coil
+        val tempFile = File(cacheDir, "temp_img_${System.currentTimeMillis()}.jpg")
+
+        imageCapture.takePicture(ImageCapture.OutputFileOptions.Builder(tempFile).build(), ContextCompat.getMainExecutor(this), object : ImageCapture.OnImageSavedCallback {
+            override fun onError(exc: ImageCaptureException) {}
+            override fun onImageSaved(output: ImageCapture.OutputFileResults) {
+                cameraExecutor.execute {
+                    encryptAndSaveFile(tempFile, false)
+                    runOnUiThread { loadLastThumbnail() }
                 }
             }
-        )
-        // Shutter flash animation
+        })
         transitionOverlay.alpha = 0.5f
         transitionOverlay.animate().alpha(0f).setDuration(100).start()
     }
 
-    // --- VIDEO CAPTURE ---
     private fun captureVideo() {
         val videoCapture = this.videoCapture ?: return
-
         if (recording != null) {
-            // STOP RECORDING
             btnCapture.animate().scaleX(1f).scaleY(1f).setDuration(200).start()
             recording?.stop()
             recording = null
@@ -209,9 +168,7 @@ class MainActivity : AppCompatActivity() {
             return
         }
 
-        // START RECORDING
         btnCapture.animate().scaleX(0.7f).scaleY(0.7f).setDuration(200).start()
-
         val tempFile = File(cacheDir, "temp_vid_${System.currentTimeMillis()}.mp4")
         recording = videoCapture.output.prepareRecording(this, FileOutputOptions.Builder(tempFile).build())
             .apply { if (ActivityCompat.checkSelfPermission(this@MainActivity, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) withAudioEnabled() }
@@ -223,16 +180,10 @@ class MainActivity : AppCompatActivity() {
                 } else if (recordEvent is VideoRecordEvent.Finalize) {
                     if (!recordEvent.hasError()) {
                         cameraExecutor.execute {
-                            // 1. Extract Thumbnail
                             val thumbFile = extractVideoThumbnail(tempFile)
                             val baseName = "secam_${System.currentTimeMillis()}"
-
-                            // 2. Encrypt Video
                             encryptSecurely(tempFile, File(filesDir, "$baseName.mp4"))
-
-                            // 3. Encrypt Thumbnail
                             if (thumbFile != null) encryptSecurely(thumbFile, File(filesDir, "${baseName}_thumb.jpg"))
-
                             runOnUiThread { loadLastThumbnail() }
                         }
                     }
@@ -244,7 +195,7 @@ class MainActivity : AppCompatActivity() {
         return try {
             val retriever = MediaMetadataRetriever()
             retriever.setDataSource(videoFile.absolutePath)
-            val bitmap = retriever.getFrameAtTime(1000000) // Frame at 1 second mark
+            val bitmap = retriever.getFrameAtTime(1000000)
             retriever.release()
 
             if (bitmap != null) {
@@ -255,9 +206,8 @@ class MainActivity : AppCompatActivity() {
         } catch (e: Exception) { null }
     }
 
-    // --- ENCRYPTION ENGINE ---
     private fun encryptAndSaveFile(tempFile: File, isVideo: Boolean) {
-        val extension = if (isVideo) ".mp4" else ".heic"
+        val extension = if (isVideo) ".mp4" else ".jpg"
         val dest = File(filesDir, "secam_${System.currentTimeMillis()}$extension")
         encryptSecurely(tempFile, dest)
     }
@@ -267,14 +217,11 @@ class MainActivity : AppCompatActivity() {
             val masterKey = MasterKey.Builder(applicationContext).setKeyScheme(MasterKey.KeyScheme.AES256_GCM).build()
             val encryptedFile = EncryptedFile.Builder(applicationContext, dest, masterKey, EncryptedFile.FileEncryptionScheme.AES256_GCM_HKDF_4KB).build()
             source.inputStream().use { input -> encryptedFile.openFileOutput().use { output -> input.copyTo(output) } }
-        } finally {
-            if (source.exists()) source.delete() // Military wipe of unencrypted file
-        }
+        } finally { if (source.exists()) source.delete() }
     }
 
-    // --- UI UPDATER ---
     private fun loadLastThumbnail() {
-        cameraExecutor.execute {
+        executor.execute {
             val files = filesDir.listFiles { _, name -> name.startsWith("secam_") }?.sortedByDescending { it.lastModified() } ?: return@execute
             if (files.isEmpty()) return@execute
 
@@ -289,12 +236,14 @@ class MainActivity : AppCompatActivity() {
             try {
                 val masterKey = MasterKey.Builder(applicationContext).setKeyScheme(MasterKey.KeyScheme.AES256_GCM).build()
                 val encryptedFile = EncryptedFile.Builder(applicationContext, targetFile, masterKey, EncryptedFile.FileEncryptionScheme.AES256_GCM_HKDF_4KB).build()
-                val bitmap = encryptedFile.openFileInput().use { BitmapFactory.decodeStream(it) }
-                runOnUiThread { btnGallery.setImageBitmap(bitmap) }
+
+                val bytes = encryptedFile.openFileInput().readBytes()
+                runOnUiThread { btnGallery.load(bytes) }
             } catch (e: Exception) { Log.e(TAG, "Failed to load icon", e) }
         }
     }
 
+    private val executor = Executors.newSingleThreadExecutor()
     private fun allPermissionsGranted() = REQUIRED_PERMISSIONS.all { ContextCompat.checkSelfPermission(baseContext, it) == PackageManager.PERMISSION_GRANTED }
-    override fun onDestroy() { super.onDestroy(); cameraExecutor.shutdown() }
+    override fun onDestroy() { super.onDestroy(); cameraExecutor.shutdown(); executor.shutdown() }
 }

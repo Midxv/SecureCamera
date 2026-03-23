@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <androidx.constraintlayout.widget.ConstraintLayout
     xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="#000000">
@@ -8,6 +9,64 @@
     <androidx.viewpager2.widget.ViewPager2
         android:id="@+id/viewPager"
         android:layout_width="match_parent"
-        android:layout_height="match_parent" />
+        android:layout_height="match_parent"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintBottom_toBottomOf="parent" />
+
+    <com.google.android.material.card.MaterialCardView
+        android:id="@+id/actionBarPill"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="24dp"
+        app:cardBackgroundColor="#CC222222"
+        app:cardCornerRadius="50dp"
+        app:cardElevation="10dp"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:strokeWidth="0.5dp"
+        app:strokeColor="#33FFFFFF">
+
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="60dp"
+            android:orientation="horizontal"
+            android:gravity="center"
+            android:paddingStart="16dp"
+            android:paddingEnd="16dp">
+
+            <ImageButton
+                android:id="@+id/btnEdit"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:src="@android:drawable/ic_menu_edit"
+                app:tint="#FFFFFF"
+                android:contentDescription="Edit" />
+
+            <View android:layout_width="20dp" android:layout_height="match_parent"/>
+
+            <ImageButton
+                android:id="@+id/btnRotate"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:src="@android:drawable/ic_menu_rotate"
+                app:tint="#FFFFFF"
+                android:contentDescription="Rotate" />
+
+            <View android:layout_width="20dp" android:layout_height="match_parent"/>
+
+            <ImageButton
+                android:id="@+id/btnDelete"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:src="@android:drawable/ic_menu_delete"
+                app:tint="#EF5350"
+                android:contentDescription="Delete" />
+
+        </LinearLayout>
+    </com.google.android.material.card.MaterialCardView>
 
 </androidx.constraintlayout.widget.ConstraintLayout>
