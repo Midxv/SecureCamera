@@ -12,9 +12,9 @@
     <application
         android:allowBackup="false"
         android:fullBackupContent="false"
-        android:icon="@mipmap/ic_launcher"
+        android:icon="@drawable/logo"
         android:label="SeCam"
-        android:roundIcon="@mipmap/ic_launcher_round"
+        android:roundIcon="@drawable/logo"
         android:supportsRtl="true"
         android:theme="@style/Theme.SeCam">
 
@@ -28,11 +28,10 @@
             </intent-filter>
         </activity>
 
-        <activity
-            android:name=".GalleryActivity"
-            android:exported="false"
-            android:screenOrientation="portrait" />
+        <activity android:name=".GalleryActivity" android:screenOrientation="portrait" />
+
+        <activity android:name=".VideoPlayerActivity" android:screenOrientation="portrait" />
+        <activity android:name=".PhotoViewerActivity" android:screenOrientation="portrait" />
 
     </application>
-
 </manifest>

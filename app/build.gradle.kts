@@ -58,10 +58,6 @@ dependencies {
     implementation("androidx.constraintlayout:constraintlayout:2.1.4")
     implementation("androidx.recyclerview:recyclerview:1.3.2")
 
-    // ---------------------------------------------------------
-    // NEW: MEDIA VIEWING & STREAMING ENGINES
-    // ---------------------------------------------------------
-
     // 5. ExoPlayer (AndroidX Media3) - For playing local 1080p 60fps video
     val media3_version = "1.3.0"
     implementation("androidx.media3:media3-exoplayer:$media3_version")
@@ -69,6 +65,9 @@ dependencies {
 
     // 6. Coil - Modern, Kotlin-first Image Loader
     implementation("io.coil-kt:coil:2.6.0")
+    implementation("com.github.chrisbanes:PhotoView:2.3.0")
+    // Allows us to manipulate image rotation metadata safely
+    implementation("androidx.exifinterface:exifinterface:1.3.7")
 
     // 7. Glide - Classic, high-performance Image Loader
     implementation("com.github.bumptech.glide:glide:4.16.0")

@@ -11,7 +11,6 @@ import android.view.ViewGroup
 import android.view.WindowManager
 import android.widget.FrameLayout
 import android.widget.ImageView
-import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.RecyclerView
@@ -165,12 +164,10 @@ class GalleryActivity : AppCompatActivity() {
                     intent.putExtra("VIDEO_PATH", file.absolutePath)
                     startActivity(intent)
                 } else {
-                    // (Optional) For later: Launch a Fullscreen Image Viewer here for .heic photos
-                    Toast.makeText(
-                        this@GalleryActivity,
-                        "Photo Viewer Coming Soon!",
-                        Toast.LENGTH_SHORT
-                    ).show()
+                    // Launch the Fullscreen Zoomable Photo Viewer
+                    val intent = Intent(this@GalleryActivity, PhotoViewerActivity::class.java)
+                    intent.putExtra("PHOTO_PATH", file.absolutePath)
+                    startActivity(intent)
                 }
             }
         }
